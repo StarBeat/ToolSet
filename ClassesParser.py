@@ -12,9 +12,9 @@ def ReplaceEndCRLF(str):
         
 class ClassesParser(object):
     #cpp
-    patt_cpp_extend = re.compile(r'class(\s+[\w_\d<>,]+\s+)?(\s*[\w_\d<>,]+\s*):\s*((public|protected|private)\s+[\w_\d<>,]+\s*)((\s*,\s*(public|protected|private)?(\s+[\w_\d<>,]+\s*))*)?')
-    patt_cpp_nobase = re.compile(r'class(\s+[\w_\d<>,]+\s*)[^:^,]{', flags = re.M)
-    getbase_from_res = re.compile(r'(public|protected|private)(\s+[\w_\d<>,]+\s*)')
+    patt_cpp_extend = re.compile(r'class(\s+[\w_\d<>,\s]+\s+)?(\s*[\w_\d<>,\s]+\s*):\s*((public|protected|private)\s+[\w_\d<>,\s]+\s*)((\s*,\s*(public|protected|private)?(\s+[\w_\d<>,\s]+\s*))*)?')
+    patt_cpp_nobase = re.compile(r'class(\s+[\w_\d<>,\s]+\s*)[^:^,]{', flags = re.M)
+    getbase_from_res = re.compile(r'(public|protected|private)(\s+[\w_\d<>,\s]+\s*)')
     #c#
     patt_cs_extend = re.compile(r'')
     patt_cs_nobase = re.compile(r'')
@@ -168,7 +168,7 @@ class ClassesParser(object):
         nx.draw_networkx_labels(graphs, pos, font_size = font_size, font_family = "sans-serif")
 
         plt.axis('off')
-        fig.savefig(name, format = 'eps', dpi = 100000)
+        fig.savefig("./map/" + name, format = 'eps', dpi = 100000)
         #plt.show()
 
 
