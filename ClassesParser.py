@@ -12,9 +12,9 @@ def ReplaceEndCRLF(str):
         
 class ClassesParser(object):
     #cpp
-    patt_cpp_extend = re.compile(r'class(\s+[\w_\d]+\s+)?(\s*[\w_\d]+\s*):\s*((public|protected|private)\s+[\w_\d]+\s*)((\s*,\s*(public|protected|private)?(\s+[\w_\d]+\s*))*)?')
-    patt_cpp_nobase = re.compile(r'class(\s+[\w_\d]+\s*)[^:^,]{', flags = re.M)
-    getbase_from_res = re.compile(r'(public|protected|private)(\s+[\w_\d]+\s*)')
+    patt_cpp_extend = re.compile(r'class(\s+[\w_\d<>,]+\s+)?(\s*[\w_\d<>,]+\s*):\s*((public|protected|private)\s+[\w_\d<>,]+\s*)((\s*,\s*(public|protected|private)?(\s+[\w_\d<>,]+\s*))*)?')
+    patt_cpp_nobase = re.compile(r'class(\s+[\w_\d<>,]+\s*)[^:^,]{', flags = re.M)
+    getbase_from_res = re.compile(r'(public|protected|private)(\s+[\w_\d<>,]+\s*)')
     #c#
     patt_cs_extend = re.compile(r'')
     patt_cs_nobase = re.compile(r'')
@@ -33,7 +33,7 @@ class ClassesParser(object):
     def __init__(self):
         super(ClassesParser, self).__init__()
         self.files = []
-        self.graphs = None
+        self.parsed = False
 
     def RecursiveTraversal(self, path):
         filels = os.listdir(path)
@@ -49,7 +49,9 @@ class ClassesParser(object):
                 self.files.append(os.path.join(fpath, f))
 
     def Parse(self):
-        if len(self.files) == 0:
+        if self.parsed:
+            return
+        if len(self.files) == 0: 
             print("Err can not find files.")
             return
         for f in self.files:
@@ -80,10 +82,13 @@ class ClassesParser(object):
             elif f.endswith(".cs"):
                 pass
 
-    def CreateBranch(self, key):
+        self.parsed = True
+
+    def CreateBranch(self, key, graphs):
         if key in self.nobaseclass_set:
             print("class " + key + " has not base class")
             return
+        print("!--------------")
         print(key)
         if key in self.visitied:
             return
@@ -91,46 +96,80 @@ class ClassesParser(object):
         if not self.classes_extend_map.has_key(key):
             return
         for x in self.classes_extend_map[key]:
-        	print(x.ext + " " + x.name)
-        	self.graphs.add_edge(key, x.name, weight = 1 if x.ext == 'public' else 0.5 if x.ext == 'protected' else 0)
-        	extls.append(x.name)
-        	self.visitied.add(key)
+            print(x.ext + " " + x.name)
+            graphs.add_edge(key, x.name, weight = 1 if x.ext == 'public' else 0.5 if x.ext == 'protected' else 0)
+            extls.append(x.name)
+            self.visitied.add(key)
         print("--------------!")
         for x in extls:
-            self.CreateBranch(x)
+            self.CreateBranch(x, graphs)
 
-    def Treed(self):
+    def Treed(self, graphs):
         for k, v in self.classes_extend_map.items():
-            print("!--------------")
-            self.CreateBranch(k)
+            self.CreateBranch(k, graphs)
 
-    def CreateNetMap(self):
-        self.graphs = nx.generators.directed.random_k_out_graph(0, 3, 0.5)
+    def OneTree(self, graphs, key):
+        self.CreateBranch(key, graphs)
+
+    def CreateAllNetMap(self):
+        graphs = nx.generators.directed.random_k_out_graph(0, 3, 0.5)
         self.Parse()
         #print(self.nobaseclass_set)
-        self.Treed()
+        self.Treed(graphs)
+        self.CreatePic(graphs)
+    
+    def CreateNetMap(self):
+        patt = re.compile(r'[\w_\d]+[^<]')
+        self.Parse()
+        for k, v in self.classes_extend_map.items():
+            graphs = nx.generators.directed.random_k_out_graph(0, 3, 0.5)
+            self.OneTree(graphs, k)
+            name = patt.findall(k)[0] + ".eps"
+            self.CreatePic(graphs, name)
 
-        epublic = [(k, v) for (k, v, x) in self.graphs.edges(data = True) if x['weight'] == 1]
-        eprotected = [(k, v) for (k, v, x) in self.graphs.edges(data = True) if x['weight'] == 0.5]
-        eprivate = [(k, v) for (k, v, x) in self.graphs.edges(data = True) if x['weight'] == 0]
-
-        pos = nx.spring_layout(self.graphs)
-        nodesize = 300
-        nodes = nx.draw_networkx_nodes(self.graphs, pos, node_size = nodesize)
-
-        nx.draw_networkx_edges(self.graphs, pos, node_size =nodesize, edgelist = epublic, width = 2, alpha = 0.5, edge_color = 'green')
-        nx.draw_networkx_edges(self.graphs, pos, node_size =nodesize, edgelist = eprotected, width = 2, alpha = 0.5, edge_color = 'blue')
-        nx.draw_networkx_edges(self.graphs, pos, node_size =nodesize, edgelist = eprivate, width = 2, alpha = 0.5, edge_color = 'red')
-        nx.draw_networkx_edges(self.graphs, pos, node_size =nodesize, width = 1, alpha = 0.5, 
-            edge_color = 'yellow', arrowstyle = "->", arrowsize = 4, edge_cmap = plt.cm.Blues)
-        #labels
-        nx.draw_networkx_labels(self.graphs, pos, font_size = 10, font_family = "sans-serif")
-        plt.axis('off')
+    def CreatePic(self, graphs, name = "pic.eps"):
+        epublic = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 1]
+        eprotected = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 0.5]
+        eprivate = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 0]
+        enums = len(epublic) + len(eprotected) + len(eprivate)
+        pos = nx.random_layout(graphs)
+        
         plt.tight_layout()
         fig = plt.gcf()
-        #fig.set_size_inches(100, 100)
-        #fig.savefig("figure.eps", format = 'eps', dpi = 10000)
-        plt.show()
+        if enums < 50:
+            #fig.set_size_inches(10, 10)
+            nodesize = 300
+            edgesize = 3
+            arrowsize1 = 0.2
+            arrowsize2 = 0.1
+            font_size = 12
+        elif enums < 100:
+            fig.set_size_inches(10, 10)
+            nodesize = 200
+            edgesize = 1
+            arrowsize1 = 0.2
+            arrowsize2 = 0.1
+            font_size = 5
+        else:
+            fig.set_size_inches(50, 50)
+            nodesize = 20
+            edgesize = 0.1
+            arrowsize1 = 0.02
+            arrowsize2 = 0.01
+            font_size = 0.5
+        nodes = nx.draw_networkx_nodes(graphs, pos, node_size = nodesize)
+        
+        nx.draw_networkx_edges(graphs, pos, node_size = nodesize, edgelist = epublic, width = edgesize, alpha = 0.5, edge_color = 'green')
+        nx.draw_networkx_edges(graphs, pos, node_size = nodesize, edgelist = eprotected, width = edgesize, alpha = 0.5, edge_color = 'blue')
+        nx.draw_networkx_edges(graphs, pos, node_size = nodesize, edgelist = eprivate, width = edgesize, alpha = 0.5, edge_color = 'red')
+        nx.draw_networkx_edges(graphs, pos, node_size = nodesize, width = arrowsize1, alpha = 0.1, 
+            edge_color = 'yellow', arrowstyle = "->", arrowsize = arrowsize2, edge_cmap = plt.cm.Blues,style = 'dashed')
+        #labels
+        nx.draw_networkx_labels(graphs, pos, font_size = font_size, font_family = "sans-serif")
+
+        plt.axis('off')
+        fig.savefig(name, format = 'eps', dpi = 100000)
+        #plt.show()
 
 
 if __name__ == '__main__':
