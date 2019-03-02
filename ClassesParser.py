@@ -119,11 +119,13 @@ class ClassesParser(object):
         self.CreatePic(graphs)
     
     def CreateNetMap(self):
-        patt = re.compile(r'[\w_\d]+[^<]')
+        patt = re.compile(r'[\w_\d]+[^<]?')
         self.Parse()
         for k, v in self.classes_extend_map.items():
             graphs = nx.generators.directed.random_k_out_graph(0, 3, 0.5)
             self.OneTree(graphs, k)
+            print( k)
+            print( patt.findall(k))
             name = patt.findall(k)[0] + ".eps"
             self.CreatePic(graphs, name)
 
@@ -131,9 +133,9 @@ class ClassesParser(object):
         epublic = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 1]
         eprotected = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 0.5]
         eprivate = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 0]
-        enums = len(epublic) + len(eprotected) + len(eprivate)
+        enums = (len(epublic) + len(eprotected) + len(eprivate)) * 2
         pos = nx.random_layout(graphs)
-        
+
         plt.tight_layout()
         fig = plt.gcf()
         if enums < 50:
@@ -151,14 +153,14 @@ class ClassesParser(object):
             arrowsize2 = 0.1
             font_size = 5
         else:
-            fig.set_size_inches(50, 50)
+            fig.set_size_inches(100, 100)
             nodesize = 20
-            edgesize = 0.1
-            arrowsize1 = 0.02
-            arrowsize2 = 0.01
-            font_size = 0.5
+            edgesize = 0.01
+            arrowsize1 = 0.002
+            arrowsize2 = 0.001
+            font_size = 0.05
         nodes = nx.draw_networkx_nodes(graphs, pos, node_size = nodesize)
-        
+
         nx.draw_networkx_edges(graphs, pos, node_size = nodesize, edgelist = epublic, width = edgesize, alpha = 0.5, edge_color = 'green')
         nx.draw_networkx_edges(graphs, pos, node_size = nodesize, edgelist = eprotected, width = edgesize, alpha = 0.5, edge_color = 'blue')
         nx.draw_networkx_edges(graphs, pos, node_size = nodesize, edgelist = eprivate, width = edgesize, alpha = 0.5, edge_color = 'red')
