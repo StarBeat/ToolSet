@@ -7,8 +7,11 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import time as ti
 
-def ReplaceEndCRLF(str):
-    return str.replace(" ", '').replace('\r', '').replace('\n', '')
+def ReplaceEndCRLF(s):
+    if s.find('<') != -1:
+        return s.replace(' ', '').replace('\r', '').replace('\n', '')
+    else:
+        return s.replace(' ', '').replace(',', '').replace('\r', '').replace('\n', '')
         
 class ClassesParser(object):
     #cpp
@@ -34,6 +37,7 @@ class ClassesParser(object):
         super(ClassesParser, self).__init__()
         self.files = []
         self.parsed = False
+        self.enums = 0
 
     def RecursiveTraversal(self, path):
         filels = os.listdir(path)
@@ -79,9 +83,9 @@ class ClassesParser(object):
                         for z in tmpbase2:
                             basels.append(ClassesParser.ExtendPair(ReplaceEndCRLF(z[1]), ReplaceEndCRLF(z[0]), ReplaceEndCRLF(f.name)))
                         self.classes_extend_map[ReplaceEndCRLF(x[1])] = basels
+
             elif f.endswith(".cs"):
                 pass
-
         self.parsed = True
 
     def CreateBranch(self, key, graphs):
@@ -98,6 +102,7 @@ class ClassesParser(object):
         for x in self.classes_extend_map[key]:
             print(x.ext + " " + x.name)
             graphs.add_edge(key, x.name, weight = 1 if x.ext == 'public' else 0.5 if x.ext == 'protected' else 0)
+            self.enums += 1
             extls.append(x.name)
             self.visitied.add(key)
         print("--------------!")
@@ -123,9 +128,9 @@ class ClassesParser(object):
         self.Parse()
         for k, v in self.classes_extend_map.items():
             graphs = nx.generators.directed.random_k_out_graph(0, 3, 0.5)
+            print(type(self.classes_extend_map[k]))
+            self.visitied = set()
             self.OneTree(graphs, k)
-            print( k)
-            print( patt.findall(k))
             name = patt.findall(k)[0] + ".eps"
             self.CreatePic(graphs, name)
 
@@ -133,32 +138,33 @@ class ClassesParser(object):
         epublic = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 1]
         eprotected = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 0.5]
         eprivate = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 0]
-        enums = (len(epublic) + len(eprotected) + len(eprivate)) * 2
+        #enums = (graphs.number_of_nodes() + graphs.number_of_nodes()) * 2
         pos = nx.random_layout(graphs)
+        self.enums *= 2
 
-        plt.tight_layout()
+        #plt.tight_layout()
         fig = plt.gcf()
-        if enums < 50:
+        if self.enums < 50:
             #fig.set_size_inches(10, 10)
             nodesize = 300
             edgesize = 3
             arrowsize1 = 0.2
             arrowsize2 = 0.1
             font_size = 12
-        elif enums < 100:
-            fig.set_size_inches(10, 10)
-            nodesize = 200
+        elif self.enums < 100:
+            fig.set_size_inches(20, 20)
+            nodesize = 100
             edgesize = 1
             arrowsize1 = 0.2
             arrowsize2 = 0.1
             font_size = 5
         else:
-            fig.set_size_inches(100, 100)
-            nodesize = 20
+            fig.set_size_inches(500, 500)
+            nodesize = 10
             edgesize = 0.01
-            arrowsize1 = 0.002
-            arrowsize2 = 0.001
-            font_size = 0.05
+            arrowsize1 = 0.02
+            arrowsize2 = 0.01
+            font_size = 0.5
         nodes = nx.draw_networkx_nodes(graphs, pos, node_size = nodesize)
 
         nx.draw_networkx_edges(graphs, pos, node_size = nodesize, edgelist = epublic, width = edgesize, alpha = 0.5, edge_color = 'green')
@@ -170,8 +176,9 @@ class ClassesParser(object):
         nx.draw_networkx_labels(graphs, pos, font_size = font_size, font_family = "sans-serif")
 
         plt.axis('off')
-        fig.savefig("./map/" + name, format = 'eps', dpi = 100000)
+        fig.savefig("./map/" + name, format = 'eps', dpi = 1000000)
         #plt.show()
+        self.enums = 0
 
 
 if __name__ == '__main__':
