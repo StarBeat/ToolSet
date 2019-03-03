@@ -15,9 +15,9 @@ def ReplaceEndCRLF(s):
             ts = s[0: len(s) - 1]
         else:
             ts = s
-        return ts.replace(' ', '').replace('\r', '').replace('\n', '')
+        return ts.replace(' ', '').replace('\r', '').replace('\n', '').replace('\t', '')
     else:
-        return s.replace(' ', '').replace(',', '').replace('\r', '').replace('\n', '')
+        return s.replace(' ', '').replace(',', '').replace('\r', '').replace('\n', '').replace('\t', '')
         
 class ClassesParser(object):
     #cpp TODO regex 修改
@@ -101,13 +101,20 @@ class ClassesParser(object):
                     else:
                         pass
                     tempclasses = self.patt_cs_extend.findall(str)
+                    #with open("filesname.xml", 'a') as fs:
+                    #    fs.write(f.name + '\n')
                     for x in tempclasses:
                         clas = ReplaceEndCRLF(x[0])
                         tmpbase = self.getcsbase_from_res.findall(x[1])
+                        #with open("test.xml", 'a') as fs: #检查符号
+                        #    fs.write(clas.__str__() + '->\n')
+                        #    fs.write(tmpbase.__str__() + '\n')
                         for z in tmpbase:
                             z = ReplaceEndCRLF(z)
                             if not self.cs_classes_derived_map.has_key(z):
                                 self.cs_classes_derived_map[z] = set()
+                            if clas in self.cs_classes_derived_map[z]:
+                                continue
                             self.cs_classes_derived_map[z].add(clas)
 
         self.parsed = True
@@ -233,5 +240,4 @@ if __name__ == '__main__':
     print("file num:", len(cp.files).__str__())
     while True:
         classname = input("input: must be legal py expression\n")
-        print(classname)
         cp.CsDerived(classname)
