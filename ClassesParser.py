@@ -14,7 +14,7 @@ def ReplaceEndCRLF(s):
         return s.replace(' ', '').replace(',', '').replace('\r', '').replace('\n', '')
         
 class ClassesParser(object):
-    #cpp
+    #cpp TODO regex 修改
     patt_cpp_extend = re.compile(r'class(\s+[\w_\d]+\s+)?(\s*[\w_][\w_\d<,\s]+>?\s*):\s*((public|protected|private)\s+[\w_\d<,\s]+>?\s*)((\s*,\s*(public|protected|private)?(\s+[\w_\d<,\s]+>?\s*))*)?')
     patt_cpp_nobase = re.compile(r'class(\s+[\w_\d]+\s+)?(\s*[\w_][\w_\d<,\s]+>?\s*)[^:^,]{', flags = re.M)
     getbase_from_res = re.compile(r'(public|protected|private)(\s+[\w_\d]+[^<]\s*|\s+[\w_\d<,\s]+>\s*)')
@@ -72,12 +72,14 @@ class ClassesParser(object):
                         pass
                     tempbase = self.patt_cpp_nobase.findall(str)
                     tempclasses = self.patt_cpp_extend.findall(str)
+                    print(tempclasses)
                     for x in tempbase:
                         self.nobaseclass_set.add(ReplaceEndCRLF(x[1]))
                     for x in tempclasses:
                         tmpbase1 = self.getbase_from_res.findall(x[2])
                         tmpbase2 = self.getbase_from_res.findall(x[4])
                         basels = []
+                        print(x[4])
                         if len(tmpbase1) != 0:
                             basels.append(ClassesParser.ExtendPair(ReplaceEndCRLF(tmpbase1[0][1]), ReplaceEndCRLF(tmpbase1[0][0]), ReplaceEndCRLF(f.name)))
                         for z in tmpbase2:
@@ -123,16 +125,22 @@ class ClassesParser(object):
         self.Treed(graphs)
         self.CreatePic(graphs)
     
-    def CreateNetMap(self):
+    def CreateNetMap(self, classname = None):
         patt = re.compile(r'[\w_\d]+[^<]?')
         self.Parse()
-        for k, v in self.classes_extend_map.items():
+        if classname != None:
             graphs = nx.generators.directed.random_k_out_graph(0, 3, 0.5)
-            print(type(self.classes_extend_map[k]))
             self.visitied = set()
-            self.OneTree(graphs, k)
-            name = patt.findall(k)[0] + ".eps"
+            self.OneTree(graphs, classname)
+            name = patt.findall(classname)[0] + ".eps"
             self.CreatePic(graphs, name)
+        else:
+            for k, v in self.classes_extend_map.items():
+                graphs = nx.generators.directed.random_k_out_graph(0, 3, 0.5)
+                self.visitied = set()
+                self.OneTree(graphs, k)
+                name = patt.findall(k)[0] + ".eps"
+                self.CreatePic(graphs, name)
 
     def CreatePic(self, graphs, name = "pic.eps"):
         epublic = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 1]
@@ -140,7 +148,7 @@ class ClassesParser(object):
         eprivate = [(k, v) for (k, v, x) in graphs.edges(data = True) if x['weight'] == 0]
         #enums = (graphs.number_of_nodes() + graphs.number_of_nodes()) * 2
         pos = nx.random_layout(graphs)
-        self.enums *= 2
+        self.enums **= 2
 
         #plt.tight_layout()
         fig = plt.gcf()
@@ -187,8 +195,9 @@ if __name__ == '__main__':
     exe_full_path = sys.argv[0]
     exe_folder_path = exe_full_path[0: exe_full_path.rfind("\\")]
     if len(sys.argv) > 1:
-        cp.Walk(sys.argv[1])
+        cp.Walk(exe_folder_path)
+        cp.CreateNetMap(sys.argv[1])
     else:
         cp.Walk(exe_folder_path)
+        cp.CreateNetMap()
     print("file num:", len(cp.files).__str__())
-    cp.CreateNetMap()
