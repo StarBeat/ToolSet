@@ -217,6 +217,9 @@ class ClassesParser(object):
         #plt.show()
         self.enums = 0
 
+    def CppDerived(self, name):
+        pass
+
     def CsDerived(self, name):
         self.Parse()
         print(name)
@@ -225,6 +228,18 @@ class ClassesParser(object):
             return
         for x in self.cs_classes_derived_map[name]:
             print(x)
+
+    def CsDerivedSave(self):
+        pass
+
+
+    def CsDerivedSave(self):
+        self.Parse()
+        with open("CsClasses.xml", 'a') as f:
+            for k, v in self.cs_classes_derived_map.items():
+                f.write(k + "-->\n")
+                for x in self.cs_classes_derived_map[k]:
+                    f.write(x + "\n")
 
 if __name__ == '__main__':
     sys.setrecursionlimit(1000000)
@@ -238,6 +253,7 @@ if __name__ == '__main__':
         cp.Walk(exe_folder_path)
         #cp.CreateNetMap()
     print("file num:", len(cp.files).__str__())
-    while True:
-        classname = input("input: must be legal py expression\n")
-        cp.CsDerived(classname)
+    cp.CsDerivedSave()
+    #while True:
+    #    classname = input("input: must be legal py expression\n")
+    #    cp.CsDerived(classname)
