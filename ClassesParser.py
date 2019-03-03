@@ -9,24 +9,35 @@ import time as ti
 
 def ReplaceEndCRLF(s):
     if s.find('<') != -1:
-        return s.replace(' ', '').replace('\r', '').replace('\n', '')
+        if s[0] == ',':
+            ts = s[1:]
+        elif s[len(s) - 1] == ',':
+            ts = s[0: len(s) - 1]
+        else:
+            ts = s
+        return ts.replace(' ', '').replace('\r', '').replace('\n', '')
     else:
         return s.replace(' ', '').replace(',', '').replace('\r', '').replace('\n', '')
         
 class ClassesParser(object):
     #cpp TODO regex 修改
-    patt_cpp_extend = re.compile(r'class(\s+[\w_\d]+\s+)?(\s*[\w_][\w_\d<,\s]+>?\s*):\s*((public|protected|private)\s+[\w_\d<,\s]+>?\s*)((\s*,\s*(public|protected|private)?(\s+[\w_\d<,\s]+>?\s*))*)?')
+    #patt_cpp_extend = re.compile(r'class(\s+[\w_\d]+\s+)?(\s*[\w_][\w_\d<,\s]+>?\s*):\s*((public|protected|private)\s+[\w_\d<,\s]+>?\s*)((\s*,\s*(public|protected|private)?(\s+[\w_\d<,\s]+>?\s*))*)?')
+    patt_cpp_extend = re.compile(r'class(\s+[\w_\d]+\s+)?(\s*[\w_][\w_\d<,\s]+>?\s*):\s*([\w\s\d_,<>]+){', flags = re.M)
     patt_cpp_nobase = re.compile(r'class(\s+[\w_\d]+\s+)?(\s*[\w_][\w_\d<,\s]+>?\s*)[^:^,]{', flags = re.M)
-    getbase_from_res = re.compile(r'(public|protected|private)(\s+[\w_\d]+[^<]\s*|\s+[\w_\d<,\s]+>\s*)')
+    getbase_from_res = re.compile(r'(public|protected|private)(\s+[\w_\d\s]+[^<^\w^\d^_]\s*|\s*[\w_\d]+<[\w_\d,\s]+>\s*)')
     #c#
-    patt_cs_extend = re.compile(r'')
+    patt_cs_extend = re.compile(r'class(\s*[\w_][\w_\d<,\s]+>?\s*):\s*([\w\s\d_,<>]+){')
+    getcsbase_from_res = re.compile(r'(\s*[\w_\d\s]+[^<^\w^\d^_]\s*|\s*[\w_\d]+<[\w_\d,\s]+>\s*)')
     patt_cs_nobase = re.compile(r'')
 
     #parse resault
-    nobaseclass_set = set()
-    classes_extend_map = dict()
+    cpp_nobaseclass_set = set()
+    cpp_classes_extend_map = dict()
     visitied = set()
 
+    cs_nobaseclass_set = set()
+    cs_classes_extend_map = dict()
+    cs_classes_derived_map = {}
     class ExtendPair():
         def __init__(self, name, ext, file_name):
             self.name = name
@@ -61,7 +72,7 @@ class ClassesParser(object):
         for f in self.files:
             if os.path.getsize(f) == 0:
                 continue
-            if f.endswith(".h") or f.endswith(".hpp") or f.endswith(".cpp") or f.endswith(".cxx"):
+            if 0 and f.endswith(".h") or f.endswith(".hpp") or f.endswith(".cpp") or f.endswith(".cxx"):
                 with open(f, 'rb') as f:
                     #print(chardet.detect(f.read())['encoding'])
                     try:
@@ -72,26 +83,37 @@ class ClassesParser(object):
                         pass
                     tempbase = self.patt_cpp_nobase.findall(str)
                     tempclasses = self.patt_cpp_extend.findall(str)
-                    print(tempclasses)
                     for x in tempbase:
-                        self.nobaseclass_set.add(ReplaceEndCRLF(x[1]))
+                        self.cpp_nobaseclass_set.add(ReplaceEndCRLF(x[1]))
                     for x in tempclasses:
-                        tmpbase1 = self.getbase_from_res.findall(x[2])
-                        tmpbase2 = self.getbase_from_res.findall(x[4])
+                        tmpbase = self.getbase_from_res.findall(x[2])
                         basels = []
-                        print(x[4])
-                        if len(tmpbase1) != 0:
-                            basels.append(ClassesParser.ExtendPair(ReplaceEndCRLF(tmpbase1[0][1]), ReplaceEndCRLF(tmpbase1[0][0]), ReplaceEndCRLF(f.name)))
-                        for z in tmpbase2:
+                        for z in tmpbase:
                             basels.append(ClassesParser.ExtendPair(ReplaceEndCRLF(z[1]), ReplaceEndCRLF(z[0]), ReplaceEndCRLF(f.name)))
-                        self.classes_extend_map[ReplaceEndCRLF(x[1])] = basels
+                        self.cpp_classes_extend_map[ReplaceEndCRLF(x[1])] = basels
 
             elif f.endswith(".cs"):
-                pass
+                with open(f, 'rb') as f:
+                    try:
+                        str = f.read().decode(encoding = "UTF-8", errors = 'ignore')
+                    except Exception as e:
+                        str = f.read().decode(encoding = "GBK", errors = 'ignore')
+                    else:
+                        pass
+                    tempclasses = self.patt_cs_extend.findall(str)
+                    for x in tempclasses:
+                        clas = ReplaceEndCRLF(x[0])
+                        tmpbase = self.getcsbase_from_res.findall(x[1])
+                        for z in tmpbase:
+                            z = ReplaceEndCRLF(z)
+                            if not self.cs_classes_derived_map.has_key(z):
+                                self.cs_classes_derived_map[z] = set()
+                            self.cs_classes_derived_map[z].add(clas)
+
         self.parsed = True
 
     def CreateBranch(self, key, graphs):
-        if key in self.nobaseclass_set:
+        if key in self.cpp_nobaseclass_set:
             print("class " + key + " has not base class")
             return
         print("!--------------")
@@ -99,9 +121,9 @@ class ClassesParser(object):
         if key in self.visitied:
             return
         extls = []
-        if not self.classes_extend_map.has_key(key):
+        if not self.cpp_classes_extend_map.has_key(key):
             return
-        for x in self.classes_extend_map[key]:
+        for x in self.cpp_classes_extend_map[key]:
             print(x.ext + " " + x.name)
             graphs.add_edge(key, x.name, weight = 1 if x.ext == 'public' else 0.5 if x.ext == 'protected' else 0)
             self.enums += 1
@@ -112,7 +134,7 @@ class ClassesParser(object):
             self.CreateBranch(x, graphs)
 
     def Treed(self, graphs):
-        for k, v in self.classes_extend_map.items():
+        for k, v in self.cpp_classes_extend_map.items():
             self.CreateBranch(k, graphs)
 
     def OneTree(self, graphs, key):
@@ -121,7 +143,7 @@ class ClassesParser(object):
     def CreateAllNetMap(self):
         graphs = nx.generators.directed.random_k_out_graph(0, 3, 0.5)
         self.Parse()
-        #print(self.nobaseclass_set)
+        #print(self.cpp_nobaseclass_set)
         self.Treed(graphs)
         self.CreatePic(graphs)
     
@@ -135,7 +157,7 @@ class ClassesParser(object):
             name = patt.findall(classname)[0] + ".eps"
             self.CreatePic(graphs, name)
         else:
-            for k, v in self.classes_extend_map.items():
+            for k, v in self.cpp_classes_extend_map.items():
                 graphs = nx.generators.directed.random_k_out_graph(0, 3, 0.5)
                 self.visitied = set()
                 self.OneTree(graphs, k)
@@ -188,6 +210,14 @@ class ClassesParser(object):
         #plt.show()
         self.enums = 0
 
+    def CsDerived(self, name):
+        self.Parse()
+        print(name)
+        if not self.cs_classes_derived_map.has_key(name):
+            print("Err has not this class")
+            return
+        for x in self.cs_classes_derived_map[name]:
+            print(x)
 
 if __name__ == '__main__':
     sys.setrecursionlimit(1000000)
@@ -199,5 +229,9 @@ if __name__ == '__main__':
         cp.CreateNetMap(sys.argv[1])
     else:
         cp.Walk(exe_folder_path)
-        cp.CreateNetMap()
+        #cp.CreateNetMap()
     print("file num:", len(cp.files).__str__())
+    while True:
+        classname = input("input: must be legal py expression\n")
+        print(classname)
+        cp.CsDerived(classname)
